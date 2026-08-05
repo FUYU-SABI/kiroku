@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0E2A2B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ひとこと">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<title>ひとこと — 音声ToDo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700;900&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root{
+  --ink:#0E2A2B;
+  --ink-2:#143A3C;
+  --paper:#F2EBDC;
+  --paper-dim:rgba(242,235,220,.52);
+  --paper-faint:rgba(242,235,220,.13);
+  --rec:#FF4A3D;
+  --signal:#7BE0A8;
+  --sans:'Zen Kaku Gothic New',-apple-system,BlinkMacSystemFont,'Hiragino Sans','Noto Sans JP',sans-serif;
+  --mono:'Roboto Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  margin:0;background:var(--ink);color:var(--paper);
+  font-family:var(--sans);font-weight:400;
+  display:flex;flex-direction:column;
+  overscroll-behavior:none;
+}
+
+/* ---------- ヘッダー ---------- */
+header{
+  padding:calc(env(safe-area-inset-top) + 18px) 20px 14px;
+  display:flex;align-items:baseline;justify-content:space-between;
+  border-bottom:1px solid var(--paper-faint);
+}
+.wordmark{font-weight:900;font-size:19px;letter-spacing:.14em}
+.wordmark span{color:var(--rec)}
+.count{font-family:var(--mono);font-size:12px;color:var(--paper-dim);letter-spacing:.08em}
+
+/* ---------- リスト ---------- */
+main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 0 12px}
+.empty{
+  padding:64px 32px;text-align:center;color:var(--paper-dim);
+  font-size:14px;line-height:2;
+}
+.empty b{display:block;color:var(--paper);font-size:16px;font-weight:700;margin-bottom:10px}
+
+.item{
+  display:flex;gap:14px;align-items:flex-start;
+  padding:16px 20px;border-bottom:1px solid var(--paper-faint);
+  animation:slide .28s cubic-bezier(.2,.8,.3,1);
+}
+@keyframes slide{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+.stamp{
+  font-family:var(--mono);font-size:11px;color:var(--paper-dim);
+  padding-top:4px;min-width:42px;letter-spacing:.04em;
+}
+.body{flex:1;min-width:0}
+.text{
+  font-size:16px;line-height:1.6;word-break:break-word;
+  background:none;border:none;color:var(--paper);font-family:var(--sans);
+  width:100%;padding:0;resize:none;overflow:hidden;
+}
+.text:focus{outline:none;border-bottom:1px solid var(--signal)}
+.chips{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+.chip{
+  font-size:11.5px;padding:4px 10px;border-radius:99px;
+  border:1px solid var(--paper-faint);color:var(--paper-dim);
+  background:none;font-family:var(--sans);cursor:pointer;
+}
+.chip[aria-pressed="true"]{
+  border-color:var(--signal);color:var(--signal);
+}
+.kill{
+  background:none;border:none;color:var(--paper-dim);
+  font-size:20px;line-height:1;padding:2px 4px;cursor:pointer;font-family:var(--mono);
+}
+
+/* ---------- 録音バー ---------- */
+footer{
+  border-top:1px solid var(--paper-faint);
+  background:var(--ink-2);
+  padding:16px 20px calc(env(safe-area-inset-bottom) + 18px);
+}
+.heard{
+  min-height:22px;font-size:14px;line-height:1.5;color:var(--paper-dim);
+  margin-bottom:14px;text-align:center;
+}
+.heard.live{color:var(--paper)}
+
+/* シグネチャ:聞き取り中のバー */
+.meter{display:flex;gap:3px;justify-content:center;align-items:flex-end;height:20px;margin-bottom:14px}
+.meter i{width:3px;height:3px;background:var(--paper-faint);border-radius:2px;display:block}
+.rec .meter i{background:var(--rec);animation:bounce .7s ease-in-out infinite}
+.rec .meter i:nth-child(2){animation-delay:.09s}
+.rec .meter i:nth-child(3){animation-delay:.18s}
+.rec .meter i:nth-child(4){animation-delay:.05s}
+.rec .meter i:nth-child(5){animation-delay:.22s}
+.rec .meter i:nth-child(6){animation-delay:.13s}
+.rec .meter i:nth-child(7){animation-delay:.27s}
+@keyframes bounce{0%,100%{height:3px}50%{height:20px}}
+
+.controls{display:flex;gap:12px;align-items:center}
+.mic{
+  flex:1;height:60px;border-radius:14px;border:none;cursor:pointer;
+  background:var(--paper);color:var(--ink);
+  font-family:var(--sans);font-weight:900;font-size:17px;letter-spacing:.06em;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  transition:transform .12s,background .18s;
+}
+.mic:active{transform:scale(.97)}
+.rec .mic{background:var(--rec);color:var(--paper)}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--rec)}
+.rec .dot{background:var(--paper);animation:blink .9s steps(2,start) infinite}
+@keyframes blink{50%{opacity:0}}
+.type{
+  width:60px;height:60px;border-radius:14px;flex:none;cursor:pointer;
+  background:none;border:1px solid var(--paper-faint);color:var(--paper);
+  font-size:22px;font-family:var(--mono);
+}
+
+/* インライン入力 */
+.compose{display:none;gap:10px;align-items:flex-end;margin-bottom:12px}
+.compose.open{display:flex}
+.compose textarea{
+  flex:1;min-height:52px;max-height:140px;padding:14px 14px;
+  background:var(--ink);border:1px solid var(--paper-faint);border-radius:12px;
+  color:var(--paper);font-family:var(--sans);font-size:16px;line-height:1.5;resize:none;
+}
+.compose textarea:focus{outline:none;border-color:var(--signal)}
+.compose button{
+  height:52px;padding:0 20px;flex:none;border-radius:12px;border:none;cursor:pointer;
+  background:var(--paper);color:var(--ink);font-family:var(--sans);font-weight:700;font-size:15px;
+}
+.compose button:disabled{background:var(--paper-faint);color:var(--paper-dim);cursor:default}
+.type[aria-expanded="true"]{border-color:var(--signal);color:var(--signal)}
+
+/* コピー用シート */
+.sheet{
+  display:none;position:fixed;inset:0;background:rgba(14,42,43,.94);
+  padding:24px;flex-direction:column;justify-content:center;gap:14px;z-index:20;
+}
+.sheet.open{display:flex}
+.sheet p{margin:0;font-size:14px;color:var(--paper-dim);text-align:center;line-height:1.7}
+.sheet textarea{
+  height:44vh;padding:16px;background:var(--ink-2);border:1px solid var(--paper-faint);
+  border-radius:12px;color:var(--paper);font-family:var(--sans);font-size:15px;line-height:1.8;resize:none;
+}
+.sheet button{
+  height:50px;border-radius:12px;border:1px solid var(--paper-faint);background:none;
+  color:var(--paper);font-family:var(--sans);font-weight:700;font-size:15px;cursor:pointer;
+}
+
+/* 送信状態 */
+.status{margin-top:10px;font-size:12px;line-height:1.7;text-align:center;color:var(--paper-dim);min-height:1em}
+.status.err{color:var(--rec)}
+.status.done{color:var(--signal)}
+
+/* 設定パネル（診断と同じ見た目を流用） */
+.diag select{
+  width:100%;margin-top:6px;padding:12px;border-radius:10px;
+  background:var(--ink-2);border:1px solid var(--paper-faint);color:var(--paper);
+  font-family:var(--sans);font-size:15px;
+}
+.diag .danger{
+  margin-top:14px;width:100%;height:46px;border-radius:12px;
+  background:none;border:1px solid var(--rec);color:var(--rec);
+  font-family:var(--sans);font-weight:700;font-size:14px;cursor:pointer;
+}
+
+/* 診断パネル */
+.diag{
+  display:none;position:fixed;inset:0;background:var(--ink);z-index:30;
+  padding:calc(env(safe-area-inset-top) + 20px) 20px calc(env(safe-area-inset-bottom) + 20px);
+  overflow-y:auto;
+}
+.diag.open{display:block}
+.diag h2{font-size:16px;font-weight:900;letter-spacing:.1em;margin:0 0 4px}
+.diag .lead{font-size:12.5px;color:var(--paper-dim);line-height:1.8;margin:0 0 18px}
+.diag dl{margin:0;font-size:13px}
+.diag dt{
+  font-family:var(--mono);font-size:11px;color:var(--paper-dim);
+  letter-spacing:.06em;margin-top:14px;
+}
+.diag dd{margin:4px 0 0;line-height:1.6;word-break:break-all}
+.ok{color:var(--signal)}
+.ng{color:var(--rec);font-weight:700}
+.diag .fix{
+  margin-top:22px;padding:14px;border:1px solid var(--rec);border-radius:10px;
+  font-size:12.5px;line-height:1.9;color:var(--paper);
+}
+.diag .fix b{color:var(--rec)}
+.diag .close{
+  margin-top:20px;width:100%;height:48px;border-radius:12px;
+  background:none;border:1px solid var(--paper-faint);color:var(--paper);
+  font-family:var(--sans);font-weight:700;font-size:15px;cursor:pointer;
+}
+.note button.link{
+  background:none;border:none;color:var(--signal);font-family:var(--sans);
+  font-size:11.5px;text-decoration:underline;cursor:pointer;padding:0;
+}
+
+.send{
+  width:100%;margin-top:12px;height:48px;border-radius:12px;cursor:pointer;
+  background:none;border:1px solid var(--signal);color:var(--signal);
+  font-family:var(--sans);font-weight:700;font-size:15px;
+}
+.send:disabled{border-color:var(--paper-faint);color:var(--paper-dim);cursor:default}
+
+.note{
+  margin-top:12px;font-size:11.5px;line-height:1.7;color:var(--paper-dim);text-align:center;
+}
+.note a{color:var(--signal)}
+
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wordmark">ひと<span>こ</span>と</div>
+  <div class="count" id="count">0 件</div>
+</header>
+
+<main id="list"></main>
+
+<footer id="foot">
+  <div class="heard" id="heard">タップして話しかけてください</div>
+  <div class="meter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="compose" id="compose">
+    <textarea id="composeText" rows="1" placeholder="タスクを入力" aria-label="タスクを入力"></textarea>
+    <button id="composeAdd" disabled>追加</button>
+  </div>
+  <div class="controls">
+    <button class="mic" id="mic"><span class="dot"></span><span id="micLabel">話す</span></button>
+    <button class="type" id="typeBtn" title="キーボードで追加" aria-expanded="false" aria-label="キーボードで追加">⌨</button>
+  </div>
+  <button class="send" id="send" disabled>Google ToDo に送る</button>
+  <div class="status" id="status"></div>
+  <div class="note" id="note"></div>
+</footer>
+
+<div class="sheet" id="sheet">
+  <p>この内容を長押しでコピーして、Google ToDo に貼り付けてください</p>
+  <textarea id="sheetText" readonly></textarea>
+  <button id="sheetOpen">Google ToDo を開く</button>
+  <button id="sheetClose">閉じる</button>
+</div>
+
+<div class="diag" id="conf">
+  <h2>Google ToDo の接続</h2>
+  <p class="lead">送信先のリストを選べます。リストはGoogle ToDo側で作ったものが表示されます。</p>
+  <dl id="confBody"></dl>
+  <button class="danger" id="confLogout">接続を解除する</button>
+  <button class="close" id="confClose">閉じる</button>
+</div>
+
+<div class="diag" id="diag">
+  <h2>PWA 自己診断</h2>
+  <p class="lead">「アドレスバーが消えない」「アイコンが違う」ときはここを見てください。<span class="ng">赤い項目</span>が原因です。</p>
+  <dl id="diagBody"></dl>
+  <div id="diagFix"></div>
+  <button class="close" id="diagClose">閉じる</button>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- 状態 ----------
+  let items = [];
+  const KEY = "hitokoto.items";
+
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(items)); } catch(e){} };
+  const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch(e){ return []; } };
+  items = load();
+
+  const $ = id => document.getElementById(id);
+  const list = $("list"), heard = $("heard"), foot = $("foot"),
+        mic = $("mic"), micLabel = $("micLabel"), send = $("send"),
+        countEl = $("count"), note = $("note");
+
+  const stamp = ts => {
+    const d = new Date(ts);
+    return String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
+  };
+
+  // ---------- 描画 ----------
+  function render(){
+    countEl.textContent = items.length + " 件";
+    send.disabled = items.length === 0;
+    if(typeof refreshSendLabel === "function") refreshSendLabel();
+
+    if(!items.length){
+      list.innerHTML = '<div class="empty"><b>まだ何もありません</b>思いついたら下のボタンを押して、<br>そのまま話しかけてください。</div>';
+      return;
+    }
+
+    list.innerHTML = "";
+    items.forEach((it, i) => {
+      const row = document.createElement("div");
+      row.className = "item";
+
+      const s = document.createElement("div");
+      s.className = "stamp";
+      s.textContent = stamp(it.ts);
+
+      const body = document.createElement("div");
+      body.className = "body";
+
+      const ta = document.createElement("textarea");
+      ta.className = "text";
+      ta.rows = 1;
+      ta.value = it.text;
+      ta.setAttribute("aria-label", "タスクの内容");
+      const grow = () => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; };
+      ta.addEventListener("input", () => { items[i].text = ta.value; save(); grow(); });
+      setTimeout(grow, 0);
+
+      const chips = document.createElement("div");
+      chips.className = "chips";
+      [["today","今日"],["tomorrow","明日"],["none","期日なし"]].forEach(([v,label]) => {
+        const c = document.createElement("button");
+        c.className = "chip";
+        c.textContent = label;
+        c.setAttribute("aria-pressed", String(it.due === v));
+        c.onclick = () => { items[i].due = v; save(); render(); };
+        chips.appendChild(c);
+      });
+
+      const kill = document.createElement("button");
+      kill.className = "kill";
+      kill.textContent = "×";
+      kill.setAttribute("aria-label", "削除");
+      kill.onclick = () => { items.splice(i,1); save(); render(); };
+
+      body.append(ta, chips);
+      row.append(s, body, kill);
+      list.appendChild(row);
+    });
+  }
+
+  function add(text){
+    text = (text || "").trim();
+    if(!text) return;
+    items.unshift({ text, due:"none", ts: Date.now() });
+    save(); render();
+    list.scrollTop = 0;
+  }
+
+  // ---------- 音声認識 ----------
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let rec = null, listening = false;
+
+  function setRec(on){
+    listening = on;
+    foot.classList.toggle("rec", on);
+    micLabel.textContent = on ? "聞いています" : "話す";
+  }
+
+  function startVoice(){
+    if(!SR){ promptText(); return; }
+    if(listening){ try{ rec.stop(); }catch(e){} return; }
+
+    rec = new SR();
+    rec.lang = "ja-JP";
+    rec.interimResults = true;
+    rec.continuous = false;
+    rec.maxAlternatives = 1;
+
+    rec.onstart = () => { setRec(true); heard.textContent = "…"; heard.classList.add("live"); };
+
+    rec.onresult = e => {
+      let finalText = "", interim = "";
+      for(let i = e.resultIndex; i < e.results.length; i++){
+        const r = e.results[i];
+        if(r.isFinal) finalText += r[0].transcript;
+        else interim += r[0].transcript;
+      }
+      if(interim) heard.textContent = interim;
+      if(finalText){ add(finalText); heard.textContent = "登録しました"; }
+    };
+
+    rec.onerror = e => {
+      setRec(false);
+      heard.classList.remove("live");
+      if(e.error === "not-allowed" || e.error === "service-not-allowed"){
+        heard.textContent = "マイクが使えません。ブラウザの設定で許可してください";
+      } else if(e.error === "no-speech"){
+        heard.textContent = "聞き取れませんでした。もう一度どうぞ";
+      } else {
+        heard.textContent = "認識できませんでした（" + e.error + "）";
+      }
+    };
+
+    rec.onend = () => {
+      setRec(false);
+      heard.classList.remove("live");
+      if(heard.textContent === "…") heard.textContent = "タップして話しかけてください";
+    };
+
+    try { rec.start(); }
+    catch(e){ setRec(false); heard.textContent = "起動できませんでした。もう一度タップしてください"; }
+  }
+
+  // ---------- キーボード入力 ----------
+  const compose = $("compose"), composeText = $("composeText"), composeAdd = $("composeAdd"),
+        typeBtn = $("typeBtn");
+
+  function toggleCompose(force){
+    const open = force !== undefined ? force : !compose.classList.contains("open");
+    compose.classList.toggle("open", open);
+    typeBtn.setAttribute("aria-expanded", String(open));
+    if(open){ composeText.focus(); }
+    else { composeText.value = ""; composeAdd.disabled = true; composeText.style.height = "auto"; }
+  }
+
+  function commitCompose(){
+    const t = composeText.value.trim();
+    if(!t) return;
+    add(t);
+    heard.textContent = "登録しました";
+    composeText.value = "";
+    composeAdd.disabled = true;
+    composeText.style.height = "auto";
+    composeText.focus();
+  }
+
+  composeText.addEventListener("input", () => {
+    composeAdd.disabled = !composeText.value.trim();
+    composeText.style.height = "auto";
+    composeText.style.height = Math.min(composeText.scrollHeight, 140) + "px";
+  });
+  composeText.addEventListener("keydown", e => {
+    if(e.key === "Enter" && !e.shiftKey){ e.preventDefault(); commitCompose(); }
+    if(e.key === "Escape") toggleCompose(false);
+  });
+  composeAdd.onclick = commitCompose;
+  typeBtn.onclick = () => toggleCompose();
+
+  mic.onclick = () => { toggleCompose(false); startVoice(); };
+
+  // ================= Google Tasks 連携 =================
+  const CLIENT_ID = "11013707560-o359n0ca082ukhmh5vvasi25r85qegnj.apps.googleusercontent.com";
+  const SCOPE = "https://www.googleapis.com/auth/tasks";
+  const API = "https://tasks.googleapis.com/tasks/v1";
+  const TOK_KEY = "hitokoto.token";
+  const LIST_KEY = "hitokoto.listId";
+
+  const status = $("status");
+  const setStatus = (msg, cls) => {
+    status.textContent = msg || "";
+    status.className = "status" + (cls ? " " + cls : "");
+  };
+
+  let tokenClient = null;
+  let token = null;   // { value, exp }
+
+  try { token = JSON.parse(localStorage.getItem(TOK_KEY)); } catch(e){}
+  const tokenAlive = () => token && token.exp > Date.now() + 60000;
+
+  function saveToken(value, expiresIn){
+    token = { value, exp: Date.now() + (expiresIn - 60) * 1000 };
+    try { localStorage.setItem(TOK_KEY, JSON.stringify(token)); } catch(e){}
+  }
+  function clearToken(){
+    token = null;
+    try { localStorage.removeItem(TOK_KEY); } catch(e){}
+  }
+
+  /* アクセストークンを取る。必ずボタン押下（ユーザー操作）から呼ぶこと。
+     そうしないとポップアップがブロックされる。 */
+  function getToken(){
+    if(tokenAlive()) return Promise.resolve(token.value);
+
+    return new Promise((resolve, reject) => {
+      if(!window.google || !google.accounts || !google.accounts.oauth2){
+        reject(new Error("LIB")); return;
+      }
+      if(!tokenClient){
+        tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: CLIENT_ID,
+          scope: SCOPE,
+          callback: () => {},          // 呼び出しごとに差し替える
+          error_callback: () => {},
+        });
+      }
+      tokenClient.callback = res => {
+        if(res && res.access_token){
+          saveToken(res.access_token, res.expires_in || 3600);
+          resolve(res.access_token);
+        } else {
+          reject(new Error("NOTOKEN"));
+        }
+      };
+      tokenClient.error_callback = err => {
+        reject(new Error(err && err.type === "popup_closed" ? "CLOSED" : "AUTH"));
+      };
+      /* prompt:"" = 一度許可していれば同意画面を省略する */
+      tokenClient.requestAccessToken({ prompt: "" });
+    });
+  }
+
+  async function api(path, options){
+    const t = await getToken();
+    const res = await fetch(API + path, Object.assign({}, options, {
+      headers: Object.assign(
+        { "Authorization": "Bearer " + t, "Content-Type": "application/json" },
+        (options && options.headers) || {}
+      ),
+    }));
+    if(res.status === 401){ clearToken(); throw new Error("EXPIRED"); }
+    if(res.status === 403){ throw new Error("FORBIDDEN"); }
+    if(!res.ok) throw new Error("HTTP" + res.status);
+    return res.status === 204 ? null : res.json();
+  }
+
+  /* 期日は日付だけが意味を持つ（Google Tasks は時刻を無視する） */
+  function dueISO(due){
+    if(due !== "today" && due !== "tomorrow") return null;
+    const d = new Date();
+    if(due === "tomorrow") d.setDate(d.getDate() + 1);
+    return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())).toISOString();
+  }
+
+  async function resolveListId(){
+    let saved = null;
+    try { saved = localStorage.getItem(LIST_KEY); } catch(e){}
+    const data = await api("/users/@me/lists");
+    const lists = (data && data.items) || [];
+    if(!lists.length) throw new Error("NOLIST");
+    if(saved && lists.some(l => l.id === saved)) return saved;
+    return lists[0].id;
+  }
+
+  const errMsg = e => ({
+    LIB:       "Googleのライブラリを読み込めませんでした。通信環境を確認してください",
+    CLOSED:    "ログインが中断されました",
+    AUTH:      "ログインできませんでした。もう一度お試しください",
+    NOTOKEN:   "許可が得られませんでした",
+    EXPIRED:   "接続が切れました。もう一度送信ボタンを押してください",
+    FORBIDDEN: "権限がありません。Google Cloud で Tasks API が有効か確認してください",
+    NOLIST:    "Google ToDo にリストがありません。まず1つ作成してください",
+  }[e.message] || ("送信に失敗しました（" + e.message + "）"));
+
+  // ---------- 送信 ----------
+  let sending = false;
+
+  send.onclick = async () => {
+    if(sending || !items.length) return;
+    sending = true;
+    send.disabled = true;
+    setStatus("送信中…");
+
+    try {
+      const listId = await resolveListId();
+      /* 古いものから順に送ると、Google側で新しいものが上に来る */
+      const queue = items.slice().reverse();
+      let done = 0;
+
+      for(const it of queue){
+        const body = { title: it.text.trim() };
+        const due = dueISO(it.due);
+        if(due) body.due = due;
+
+        await api("/lists/" + encodeURIComponent(listId) + "/tasks", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+
+        /* 1件成功するごとに手元から消す。途中で落ちても二重登録にならない */
+        const idx = items.indexOf(it);
+        if(idx >= 0) items.splice(idx, 1);
+        done++;
+        save(); render();
+        setStatus("送信中… " + done + " / " + queue.length);
+      }
+
+      setStatus(done + " 件をGoogle ToDoに登録しました", "done");
+    } catch(e){
+      setStatus(errMsg(e), "err");
+    } finally {
+      sending = false;
+      send.disabled = items.length === 0;
+      refreshSendLabel();
+    }
+  };
+
+  function refreshSendLabel(){
+    send.textContent = tokenAlive()
+      ? "Google ToDo に送る" + (items.length ? "（" + items.length + "件）" : "")
+      : "Googleにログインして送る";
+  }
+
+  // ---------- 送信先リストの設定 ----------
+  const conf = $("conf"), confBody = $("confBody");
+
+  async function openConf(){
+    conf.classList.add("open");
+    confBody.innerHTML = "<dt>読み込み中…</dt>";
+    try {
+      const data = await api("/users/@me/lists");
+      const lists = (data && data.items) || [];
+      let saved = null;
+      try { saved = localStorage.getItem(LIST_KEY); } catch(e){}
+
+      confBody.innerHTML = "<dt>接続状態</dt><dd class=\"ok\">接続済み</dd><dt>送信先リスト</dt><dd></dd>";
+      const sel = document.createElement("select");
+      lists.forEach(l => {
+        const o = document.createElement("option");
+        o.value = l.id; o.textContent = l.title;
+        if(l.id === saved) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.onchange = () => { try { localStorage.setItem(LIST_KEY, sel.value); } catch(e){} };
+      confBody.lastElementChild.appendChild(sel);
+    } catch(e){
+      confBody.innerHTML = "<dt>接続状態</dt><dd class=\"ng\">" + errMsg(e) + "</dd>";
+    }
+  }
+
+  $("confClose").onclick = () => conf.classList.remove("open");
+  $("confLogout").onclick = () => {
+    if(token && window.google && google.accounts && google.accounts.oauth2){
+      try { google.accounts.oauth2.revoke(token.value, () => {}); } catch(e){}
+    }
+    clearToken();
+    try { localStorage.removeItem(LIST_KEY); } catch(e){}
+    conf.classList.remove("open");
+    setStatus("接続を解除しました");
+    refreshSendLabel();
+  };
+
+  // ---------- 手動コピー（予備手段） ----------
+  const sheet = $("sheet"), sheetText = $("sheetText");
+
+  async function manualCopy(){
+    const lines = items.map(it => {
+      const tag = it.due === "today" ? "（今日）" : it.due === "tomorrow" ? "（明日）" : "";
+      return "・" + it.text + tag;
+    }).join("\n");
+    sheetText.value = lines;
+    sheet.classList.add("open");
+    try {
+      if(navigator.clipboard && window.isSecureContext){
+        await navigator.clipboard.writeText(lines);
+      }
+    } catch(e){}
+  }
+
+  $("sheetClose").onclick = () => sheet.classList.remove("open");
+  $("sheetOpen").onclick = () => window.open("https://tasks.google.com/", "_blank", "noopener");
+
+  // ---------- 環境の説明 ----------
+  note.innerHTML = SR
+    ? ""
+    : "このブラウザは音声認識に対応していません。⌨ ボタンで入力できます。<br>Android は Chrome、iPhone は Safari をお試しください。<br>";
+  note.innerHTML +=
+    '<button class="link" id="confBtn">送信先リスト</button>　'
+    + '<button class="link" id="copyBtn">手動コピー</button>　'
+    + '<button class="link" id="diagBtn">自己診断</button>';
+
+  $("confBtn").onclick = openConf;
+  $("copyBtn").onclick = manualCopy;
+
+  // ---------- 自己診断 ----------
+  const diag = $("diag"), diagBody = $("diagBody"), diagFix = $("diagFix");
+
+  const row = (label, value, state) => {
+    const cls = state === true ? "ok" : state === false ? "ng" : "";
+    return "<dt>" + label + "</dt><dd class=\"" + cls + "\">" + value + "</dd>";
+  };
+
+  async function check(url){
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      return res.ok ? { ok:true, msg:"OK（" + res.status + "）" }
+                    : { ok:false, msg:"見つかりません（" + res.status + "）" };
+    } catch(e){
+      return { ok:false, msg:"取得できません（" + e.message + "）" };
+    }
+  }
+
+  async function runDiag(){
+    diag.classList.add("open");
+    diagBody.innerHTML = "<dt>確認中…</dt>";
+    diagFix.innerHTML = "";
+
+    const standalone = window.matchMedia("(display-mode: standalone)").matches
+                    || window.navigator.standalone === true;
+    const https = window.isSecureContext;
+
+    const [man, i192, i512, sw] = await Promise.all([
+      check("manifest.json"), check("icons/icon-192.png"),
+      check("icons/icon-512.png"), check("sw.js"),
+    ]);
+
+    let swState = "非対応のブラウザです", swOk = false;
+    if("serviceWorker" in navigator){
+      const reg = await navigator.serviceWorker.getRegistration();
+      swOk = !!(reg && reg.active);
+      swState = swOk ? "稼働中" : reg ? "登録中（少し待って再読込）" : "未登録";
+    }
+
+    let manName = "";
+    if(man.ok){
+      try {
+        const j = await (await fetch("manifest.json", {cache:"no-store"})).json();
+        manName = "OK — 名前「" + j.short_name + "」/ アイコン " + j.icons.length + "件";
+      } catch(e){ man.ok = false; manName = "JSONの中身が壊れています（" + e.message + "）"; }
+    } else manName = man.msg;
+
+    diagBody.innerHTML =
+      row("げんざいのURL", location.href) +
+      row("HTTPS（必須）", https ? "OK" : "HTTPSではありません", https) +
+      row("manifest.json", manName, man.ok) +
+      row("icons/icon-192.png", i192.msg, i192.ok) +
+      row("icons/icon-512.png", i512.msg, i512.ok) +
+      row("sw.js ファイル", sw.msg, sw.ok) +
+      row("Service Worker", swState, swOk) +
+      row("いまの表示モード", standalone ? "アプリ表示（アドレスバーなし）" : "ブラウザ表示", standalone);
+
+    const broken = [];
+    if(!https) broken.push("HTTPSで公開されていません");
+    if(!man.ok) broken.push("manifest.json が置かれていない、または場所が違います");
+    if(!i192.ok || !i512.ok) broken.push("icons フォルダがアップロードされていません");
+    if(!sw.ok) broken.push("sw.js が置かれていません");
+
+    if(broken.length){
+      diagFix.innerHTML = '<div class="fix"><b>原因はこれです</b><br>・' +
+        broken.join("<br>・") +
+        "<br><br>ファイルを正しく置き直してから、Chromeでこのページを再読込してください。";
+    } else if(!swOk){
+      diagFix.innerHTML = '<div class="fix"><b>あと一歩</b><br>ファイルは揃っています。ページを一度再読込して Service Worker を有効にしてから、Chromeのメニューを開いてください。「アプリをインストール」と表示されるはずです。</div>';
+    } else if(!standalone){
+      diagFix.innerHTML = '<div class="fix"><b>条件は満たしています</b><br>前に作ったショートカットを長押しで削除してから、Chromeのメニュー →「<b>アプリをインストール</b>」を選び直してください。「ホーム画面に追加」しか出ない場合は、ページを再読込してからもう一度開いてください。</div>';
+    } else {
+      diagFix.innerHTML = '<div class="fix" style="border-color:var(--signal)"><b style="color:var(--signal)">すべて正常です</b><br>アプリとして起動できています。</div>';
+    }
+  }
+
+  $("diagBtn").onclick = runDiag;
+  $("diagClose").onclick = () => diag.classList.remove("open");
+
+  render();
+})();
+</script>
+
+<script>
+/* オフライン起動のための Service Worker 登録。
+   https（または localhost）でのみ動く。file:// で開いた場合は静かに無視される。 */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
